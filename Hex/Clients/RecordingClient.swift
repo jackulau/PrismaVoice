@@ -1198,7 +1198,11 @@ actor RecordingClientLive {
     )
     let recordingDuration = stoppedAt.timeIntervalSince(session.startedAt)
     let wasRecording = recorder?.isRecording == true
-    recorder?.stop()
+    // Stop and destroy recorder to fully release CoreAudio connection
+    if let recorder = recorder {
+      recorder.stop()
+    }
+    self.recorder = nil
     stopMeterTask()
     endRecordingSession()
     clearActiveRecordingMetadata()
@@ -1220,6 +1224,8 @@ actor RecordingClientLive {
     }
 
     if didCopyRecording {
+      // Give CoreAudio time to fully release the old recorder's connection
+      try? await Task.sleep(for: .milliseconds(200))
       do {
         if session.backend == .recorderFallback {
           try primeRecorderForNextSession()
@@ -1367,6 +1373,7 @@ actor RecordingClientLive {
       recordingLogger.notice("Recorder already primed, skipping prepareToRecord()")
     }
 
+    recorder.isMeteringEnabled = true
     isRecorderPrimedForNextSession = false
     return recorder
   }
@@ -1377,7 +1384,7 @@ actor RecordingClientLive {
     }
 
     let recorder = try AVAudioRecorder(url: recordingURL, settings: recorderSettings)
-    recorder.isMeteringEnabled = true
+    recorder.isMeteringEnabled = false
     self.recorder = recorder
     return recorder
   }
@@ -1460,7 +1467,12 @@ actor RecordingClientLive {
     endRecordingSession()
     stopObservingSystemChanges()
     stopCaptureController(reason: "cleanup")
-    releaseRecorder(reason: "cleanup")
+    // Stop recorder to release CoreAudio connection even if not recording
+    if let recorder = recorder {
+      recorder.stop()
+      self.recorder = nil
+    }
+    isRecorderPrimedForNextSession = false
     recordingLogger.notice("RecordingClient cleaned up")
   }
 

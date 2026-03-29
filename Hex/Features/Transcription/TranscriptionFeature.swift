@@ -86,14 +86,9 @@ struct TranscriptionFeature {
       // MARK: - Lifecycle / Setup
 
       case .task:
-        // Starts two concurrent effects:
-        // 1) Observing audio meter
-        // 2) Monitoring hot key events
-        // 3) Priming the recorder for instant startup
         return .merge(
           startMeteringEffect(),
-          startHotKeyMonitoringEffect(),
-          warmUpRecorderEffect()
+          startHotKeyMonitoringEffect()
         )
 
       // MARK: - Metering
@@ -271,11 +266,6 @@ private extension TranscriptionFeature {
     }
   }
 
-  func warmUpRecorderEffect() -> Effect<Action> {
-    .run { _ in
-      await recording.warmUpRecorder()
-    }
-  }
 }
 
 // MARK: - HotKey Press/Release Handlers
