@@ -135,9 +135,6 @@ final class SuperFastCaptureController {
     processingQueue.sync { activeRecording != nil }
   }
 
-  var currentRecordingURL: URL? {
-    processingQueue.sync { activeRecording?.url }
-  }
 
   var stopTimingEstimate: StopTimingEstimate {
     processingQueue.sync {
@@ -375,8 +372,12 @@ final class SuperFastCaptureController {
 
     do {
       try recording.file.write(from: converted)
-      // Accumulate samples for live transcription snapshots
+      // Accumulate samples for live transcription snapshots (cap at 2 minutes)
       liveTranscriptionSamples.append(contentsOf: UnsafeBufferPointer(start: samples, count: sampleCount))
+      let maxSamples = Int(SuperFastCaptureConstants.sampleRate) * 120
+      if liveTranscriptionSamples.count > maxSamples {
+        liveTranscriptionSamples.removeFirst(liveTranscriptionSamples.count - maxSamples)
+      }
     } catch {
       logger.error("Failed to write capture engine audio: \(error.localizedDescription)")
       activeRecording = nil

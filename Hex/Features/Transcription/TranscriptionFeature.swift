@@ -5,7 +5,6 @@
 //  Created by Kit Langton on 1/24/25.
 //
 
-import AVFoundation
 import ComposableArchitecture
 import CoreGraphics
 import Foundation
@@ -321,7 +320,6 @@ private extension TranscriptionFeature {
 
     // Prevent system sleep during recording
     let liveTranscriptionEnabled = state.hexSettings.liveTranscriptionEnabled
-    transcriptionFeatureLogger.notice("Recording start: liveTranscriptionEnabled=\(liveTranscriptionEnabled)")
     let liveTimerEffect: Effect<Action> = liveTranscriptionEnabled
       ? .run { send in
           try await Task.sleep(for: .seconds(1.5))
@@ -647,7 +645,6 @@ private extension TranscriptionFeature {
 private extension TranscriptionFeature {
   func handleLiveTranscriptionTick(_ state: inout State) -> Effect<Action> {
     guard state.isRecording else { return .none }
-    transcriptionFeatureLogger.notice("Live transcription tick: starting snapshot transcription")
     let model = state.hexSettings.selectedModel
     let language = state.hexSettings.outputLanguage
 
@@ -658,13 +655,9 @@ private extension TranscriptionFeature {
 
       // Export accumulated samples directly from memory — no file copying or header parsing
       guard await recording.exportLiveSnapshot(snapshotURL) else {
-        transcriptionFeatureLogger.error("Live transcription: snapshot export failed (no samples)")
         await send(.liveTranscriptionError)
         return
       }
-
-      let fileSize = (try? FileManager.default.attributesOfItem(atPath: snapshotURL.path)[.size] as? Int) ?? 0
-      transcriptionFeatureLogger.notice("Live transcription: exported \(fileSize) bytes, transcribing with model \(model)")
 
       let decodeOptions = DecodingOptions(
         language: language,
@@ -672,10 +665,8 @@ private extension TranscriptionFeature {
         chunkingStrategy: .vad
       )
       let result = try await transcription.transcribe(snapshotURL, model, decodeOptions) { _ in }
-      transcriptionFeatureLogger.notice("Live transcription: got result '\(result)' (\(result.count) chars)")
       await send(.liveTranscriptionResult(result))
-    } catch: { error, send in
-      transcriptionFeatureLogger.error("Live transcription: snapshot failed: \(error.localizedDescription)")
+    } catch: { _, send in
       await send(.liveTranscriptionError)
     }
     .cancellable(id: CancelID.liveTranscriptionSnapshot, cancelInFlight: true)

@@ -34,7 +34,6 @@ struct RecordingClient {
   var getDefaultInputDeviceName: @Sendable () async -> String? = { nil }
   var warmUpRecorder: @Sendable () async -> Void = {}
   var cleanup: @Sendable () async -> Void = {}
-  var getCurrentRecordingURL: @Sendable () async -> URL? = { nil }
   var exportLiveSnapshot: @Sendable (URL) async -> Bool = { _ in false }
 }
 
@@ -53,7 +52,6 @@ extension RecordingClient: DependencyKey {
       getDefaultInputDeviceName: { await live.getDefaultInputDeviceName() },
       warmUpRecorder: { await live.warmUpRecorder() },
       cleanup: { await live.cleanup() },
-      getCurrentRecordingURL: { await live.getCurrentRecordingURL() },
       exportLiveSnapshot: { url in await live.exportLiveSnapshot(to: url) }
     )
   }
@@ -1468,19 +1466,6 @@ actor RecordingClientLive {
 
   func exportLiveSnapshot(to url: URL) -> Bool {
     captureController.exportLiveSnapshot(to: url)
-  }
-
-  func getCurrentRecordingURL() -> URL? {
-    // Try capture engine first (primary path)
-    if let url = captureController.currentRecordingURL {
-      return url
-    }
-    // Fall back to AVAudioRecorder if active
-    if activeRecordingSession?.backend == .recorderFallback,
-       recorder?.isRecording == true {
-      return recordingURL
-    }
-    return nil
   }
 }
 
